@@ -10,7 +10,7 @@ import click
 import httpx
 
 from .api import fetch_logs
-from .auth import load_credentials, login_via_browser, refresh_token_headless, save_credentials
+from .auth import clear_credentials, load_credentials, login_via_browser, refresh_token_headless, save_credentials
 
 # Fix Windows console encoding for Unicode output
 if sys.platform == "win32":
@@ -41,6 +41,7 @@ QUICK START:
 
 COMMANDS:
   login   - Authenticate with RunPod via browser
+  logout  - Clear saved credentials and browser session
   logs    - Fetch pod logs once and print to stdout
   tail    - Continuously poll for new logs and append to a file
 
@@ -101,6 +102,44 @@ def login():
     except Exception as e:
         click.echo(f"Error during login: {e}", err=True)
         sys.exit(1)
+
+
+LOGOUT_HELP = """
+Clear saved credentials and browser session.
+
+This command removes all locally stored authentication data:
+  - credentials.json (JWT token, team ID, session ID)
+  - browser_session/ (Playwright browser session data)
+
+Use this command when you want to:
+  - Log out from the current RunPod account
+  - Switch to a different RunPod account
+  - Clear sensitive data from this machine
+
+After logout, you will need to run 'runpod-log login' again to use
+the logs and tail commands.
+
+STORAGE LOCATIONS:
+  - Windows: %APPDATA%/runpod-log/
+  - Linux/Mac: ~/.config/runpod-log/
+
+EXAMPLE:
+  runpod-log logout
+"""
+
+
+@cli.command(help=LOGOUT_HELP)
+def logout():
+    creds_deleted, session_deleted = clear_credentials()
+
+    if creds_deleted or session_deleted:
+        if creds_deleted:
+            click.echo("Credentials cleared.")
+        if session_deleted:
+            click.echo("Browser session cleared.")
+        click.echo("\nLogged out successfully.")
+    else:
+        click.echo("No credentials found. Already logged out.")
 
 
 def get_credentials(token: str | None, team_id: str | None) -> tuple[str, str]:

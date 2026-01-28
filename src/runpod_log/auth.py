@@ -44,6 +44,30 @@ def load_credentials() -> dict | None:
     return None
 
 
+def clear_credentials() -> tuple[bool, bool]:
+    """Clear all stored credentials and browser session.
+
+    Returns:
+        Tuple of (credentials_deleted, session_deleted)
+    """
+    import shutil
+
+    creds_deleted = False
+    session_deleted = False
+
+    creds_path = get_credentials_path()
+    if creds_path.exists():
+        creds_path.unlink()
+        creds_deleted = True
+
+    session_path = get_session_path()
+    if session_path.exists():
+        shutil.rmtree(session_path)
+        session_deleted = True
+
+    return creds_deleted, session_deleted
+
+
 def extract_session_id_from_token(token: str) -> str | None:
     """Extract session ID from JWT token payload."""
     import base64

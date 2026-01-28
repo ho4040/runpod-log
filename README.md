@@ -105,11 +105,26 @@ cat /tmp/logs.txt
 kill %1
 ```
 
+## Logout
+
+To clear saved credentials and browser session:
+
+```bash
+runpod-log logout
+```
+
+This removes:
+- `credentials.json` - Token and team ID
+- `browser_session/` - Browser session data
+
+Use this when switching accounts or clearing sensitive data from the machine.
+
 ## Command Reference
 
 ```
 runpod-log --help
 runpod-log login --help
+runpod-log logout --help
 runpod-log logs --help
 runpod-log tail --help
 ```
