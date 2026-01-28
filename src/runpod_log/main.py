@@ -328,8 +328,8 @@ def tail(pod_id: str, output_file: str, token: str | None, team_id: str | None, 
                     click.echo(f"[+{len(new_logs)} new lines]", err=True)
 
             except httpx.HTTPStatusError as e:
-                if e.response.status_code == 401:
-                    click.echo("[Token expired, refreshing...]", err=True)
+                if e.response.status_code in (401, 404):
+                    click.echo("[Token expired or invalid, refreshing...]", err=True)
                     new_creds = refresh_token_headless()
                     if new_creds:
                         token = new_creds["token"]
@@ -337,7 +337,8 @@ def tail(pod_id: str, output_file: str, token: str | None, team_id: str | None, 
                         save_credentials(token, team_id, new_creds.get("session_id"))
                         click.echo("[Token refreshed successfully]", err=True)
                     else:
-                        click.echo("Token refresh failed. Run 'runpod-log login' to re-authenticate.", err=True)
+                        click.echo("\nAuthentication may have expired or is invalid.", err=True)
+                        click.echo("Please run 'runpod-log login' to re-authenticate.", err=True)
                         sys.exit(1)
                 else:
                     click.echo(f"Error: HTTP {e.response.status_code}", err=True)
@@ -444,7 +445,11 @@ def logs(pod_id: str, token: str | None, team_id: str | None, only: str | None, 
 
     except httpx.HTTPStatusError as e:
         click.echo(f"Error: HTTP {e.response.status_code}", err=True)
-        click.echo(f"Response: {e.response.text}", err=True)
+        if e.response.status_code in (401, 404):
+            click.echo("\nAuthentication may have expired or is invalid.", err=True)
+            click.echo("Please run 'runpod-log login' to re-authenticate.", err=True)
+        else:
+            click.echo(f"Response: {e.response.text}", err=True)
         sys.exit(1)
     except httpx.RequestError as e:
         click.echo(f"Error: {e}", err=True)
