@@ -217,13 +217,14 @@ OPTIONS:
   -t, --token     JWT token (optional if logged in via 'runpod-log login')
   -i, --team-id   Team ID (optional if logged in via 'runpod-log login')
   -n, --interval  Seconds between API polls (default: 5)
-  -l, --log-type  Type of logs: 'all', 'container', or 'system' (default: all)
+  --only          Filter to show only 'container' or 'system' logs (optional)
 
 LOG TYPES:
   RunPod pods have two types of logs:
   - container: Application logs from your container (stdout/stderr)
   - system: RunPod platform logs (volume creation, container events, etc.)
 
+  By default, BOTH container and system logs are shown together.
   Each log line is prefixed with [CONTAINER] or [SYSTEM] to indicate its type.
 
 BEHAVIOR:
@@ -234,24 +235,27 @@ BEHAVIOR:
   - On HTTP 401 (token expired), automatically refreshes token
 
 EXAMPLES:
-  # Basic usage - get all logs (uses saved credentials)
+  # Basic usage - get all logs (RECOMMENDED - shows both container and system)
   runpod-log tail abc123xyz /tmp/pod.log
-
-  # Only container logs
-  runpod-log tail abc123xyz /tmp/pod.log --log-type container
-
-  # Only system logs
-  runpod-log tail abc123xyz /tmp/pod.log --log-type system
 
   # Poll every 10 seconds
   runpod-log tail abc123xyz /tmp/pod.log --interval 10
+
+  # Filter to only container logs (use only when you need to exclude system logs)
+  runpod-log tail abc123xyz /tmp/pod.log --only container
+
+  # Filter to only system logs (use only when you need to exclude container logs)
+  runpod-log tail abc123xyz /tmp/pod.log --only system
 
   # With explicit credentials
   runpod-log tail abc123xyz /tmp/pod.log -t "eyJ..." -i "team_xxx"
 
 FOR AI AGENTS:
-  Run this command in the background, then read the output file to analyze
-  logs. Example workflow:
+  IMPORTANT: Do NOT use --only flag unless specifically asked to filter logs.
+  By default, both container and system logs are shown, which provides
+  complete information for debugging.
+
+  Example workflow:
     1. Start: runpod-log tail <pod-id> /tmp/logs.txt &
     2. Wait a few seconds for logs to accumulate
     3. Read /tmp/logs.txt to analyze the logs
@@ -280,15 +284,15 @@ FOR AI AGENTS:
     help="Polling interval in seconds",
 )
 @click.option(
-    "--log-type", "-l",
+    "--only",
     metavar="TYPE",
-    type=click.Choice(["all", "container", "system"], case_sensitive=False),
-    default="all",
-    show_default=True,
-    help="Type of logs to fetch: all, container, or system",
+    type=click.Choice(["container", "system"], case_sensitive=False),
+    default=None,
+    help="Filter to show only 'container' or 'system' logs (default: show both)",
 )
-def tail(pod_id: str, output_file: str, token: str | None, team_id: str | None, interval: int, log_type: str) -> None:
+def tail(pod_id: str, output_file: str, token: str | None, team_id: str | None, interval: int, only: str | None) -> None:
     token, team_id = get_credentials(token, team_id)
+    log_type = only if only else "all"
     output_path = Path(output_file)
 
     click.echo(f"Tailing logs from pod '{pod_id}' to '{output_file}'")
@@ -359,7 +363,7 @@ ARGUMENTS:
 OPTIONS:
   -t, --token       JWT token (optional if logged in via 'runpod-log login')
   -i, --team-id     Team ID (optional if logged in via 'runpod-log login')
-  -l, --log-type    Type of logs: 'all', 'container', or 'system' (default: all)
+  --only            Filter to show only 'container' or 'system' logs (optional)
   -j, --json-output Print raw JSON response instead of parsed logs
 
 LOG TYPES:
@@ -367,6 +371,7 @@ LOG TYPES:
   - container: Application logs from your container (stdout/stderr)
   - system: RunPod platform logs (volume creation, container events, etc.)
 
+  By default, BOTH container and system logs are shown together.
   Each log line is prefixed with [CONTAINER] or [SYSTEM] to indicate its type.
 
 OUTPUT:
@@ -374,14 +379,8 @@ OUTPUT:
   With --json-output, prints the full API response as formatted JSON.
 
 EXAMPLES:
-  # Fetch and print all logs
+  # Fetch and print all logs (RECOMMENDED - shows both container and system)
   runpod-log logs abc123xyz
-
-  # Only container logs
-  runpod-log logs abc123xyz --log-type container
-
-  # Only system logs
-  runpod-log logs abc123xyz --log-type system
 
   # Save to file
   runpod-log logs abc123xyz > /tmp/pod.log
@@ -389,12 +388,20 @@ EXAMPLES:
   # Get raw JSON response
   runpod-log logs abc123xyz --json-output
 
+  # Filter to only container logs (use only when you need to exclude system logs)
+  runpod-log logs abc123xyz --only container
+
+  # Filter to only system logs (use only when you need to exclude container logs)
+  runpod-log logs abc123xyz --only system
+
   # With explicit credentials
   runpod-log logs abc123xyz -t "eyJ..." -i "team_xxx"
 
 FOR AI AGENTS:
-  Use 'logs' for a one-time snapshot. For continuous monitoring,
-  use 'tail' instead which writes to a file you can read periodically.
+  IMPORTANT: Do NOT use --only flag unless specifically asked to filter logs.
+  By default, both container and system logs are shown, which provides
+  complete information for debugging. Use 'logs' for a one-time snapshot.
+  For continuous monitoring, use 'tail' instead which writes to a file.
 """
 
 
@@ -411,20 +418,20 @@ FOR AI AGENTS:
     help="RunPod team ID (uses saved credentials if not provided)",
 )
 @click.option(
-    "--log-type", "-l",
+    "--only",
     metavar="TYPE",
-    type=click.Choice(["all", "container", "system"], case_sensitive=False),
-    default="all",
-    show_default=True,
-    help="Type of logs to fetch: all, container, or system",
+    type=click.Choice(["container", "system"], case_sensitive=False),
+    default=None,
+    help="Filter to show only 'container' or 'system' logs (default: show both)",
 )
 @click.option(
     "--json-output", "-j",
     is_flag=True,
     help="Output raw JSON response from API",
 )
-def logs(pod_id: str, token: str | None, team_id: str | None, log_type: str, json_output: bool) -> None:
+def logs(pod_id: str, token: str | None, team_id: str | None, only: str | None, json_output: bool) -> None:
     token, team_id = get_credentials(token, team_id)
+    log_type = only if only else "all"
 
     try:
         result = fetch_logs(pod_id, token, team_id)
