@@ -125,11 +125,11 @@ By default, both types are fetched and prefixed with `[CONTAINER]` or `[SYSTEM]`
 
 ## How It Works
 
-1. **Authentication**: Uses Playwright to open a browser for RunPod login. Captures JWT token from API requests.
+1. **Authentication**: Uses Playwright's persistent browser context (`launch_persistent_context`) to open a Chromium browser. The browser session (cookies, localStorage, IndexedDB) is saved to disk, so subsequent logins will already be authenticated. JWT tokens are captured by intercepting requests to `hapi.runpod.net`.
 
-2. **Token Refresh**: Saves browser session data. When token expires, uses headless browser to refresh automatically.
+2. **Token Refresh**: RunPod JWT tokens expire in ~60 seconds. When a 401 error occurs, the tool launches a headless browser using the saved session to automatically obtain a fresh token without user interaction.
 
-3. **Log API**: Calls `https://hapi.runpod.net/v1/pod/{pod_id}/logs` with JWT token.
+3. **Log API**: Calls `https://hapi.runpod.net/v1/pod/{pod_id}/logs` with JWT token and team ID headers.
 
 ## Storage Locations
 
