@@ -50,8 +50,14 @@ Credentials are saved locally, and browser session is preserved for automatic to
 ### 2. Fetch Logs (One-time)
 
 ```bash
-# Print logs to stdout
+# Print all logs (container + system) to stdout
 runpod-log logs <pod-id>
+
+# Only container logs (your application stdout/stderr)
+runpod-log logs <pod-id> --log-type container
+
+# Only system logs (RunPod platform events)
+runpod-log logs <pod-id> --log-type system
 
 # Save to file
 runpod-log logs <pod-id> > output.log
@@ -65,7 +71,14 @@ runpod-log logs <pod-id> --json-output
 Continuously poll for new logs and append to a file:
 
 ```bash
+# Tail all logs (container + system)
 runpod-log tail <pod-id> output.log
+
+# Only container logs
+runpod-log tail <pod-id> output.log --log-type container
+
+# Only system logs
+runpod-log tail <pod-id> output.log --log-type system
 
 # Custom polling interval (default: 5 seconds)
 runpod-log tail <pod-id> output.log --interval 10
@@ -75,6 +88,7 @@ The `tail` command:
 - Runs continuously until interrupted with Ctrl+C
 - Automatically refreshes tokens when they expire
 - Deduplicates logs to avoid duplicates
+- Prefixes each line with `[CONTAINER]` or `[SYSTEM]` to indicate log type
 
 ## For AI Agents
 
@@ -99,6 +113,15 @@ runpod-log login --help
 runpod-log logs --help
 runpod-log tail --help
 ```
+
+## Log Types
+
+RunPod pods produce two types of logs:
+
+- **Container logs**: Application output from your container (stdout/stderr)
+- **System logs**: RunPod platform events (volume creation, container lifecycle, etc.)
+
+By default, both types are fetched and prefixed with `[CONTAINER]` or `[SYSTEM]`.
 
 ## How It Works
 

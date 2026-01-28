@@ -123,16 +123,40 @@ def get_credentials(token: str | None, team_id: str | None) -> tuple[str, str]:
     return token, team_id
 
 
-def extract_logs(result: dict | list) -> list[str]:
-    """Extract log lines from API response."""
+def extract_logs(result: dict | list, log_type: str = "all") -> list[str]:
+    """Extract log lines from API response.
+
+    Args:
+        result: API response (dict with 'container' and/or 'system' keys, or list)
+        log_type: Which logs to extract - 'container', 'system', or 'all' (default)
+
+    Returns:
+        List of log lines
+    """
     if isinstance(result, dict):
-        # API returns {"container": [...]} for container logs
-        if "container" in result:
-            return result["container"]
-        elif "logs" in result:
+        # Check if this is the expected RunPod format with container/system keys
+        has_runpod_format = "container" in result or "system" in result
+
+        if has_runpod_format:
+            logs = []
+
+            if log_type in ("all", "system") and "system" in result:
+                for line in result["system"]:
+                    logs.append(f"[SYSTEM] {line}")
+
+            if log_type in ("all", "container") and "container" in result:
+                for line in result["container"]:
+                    logs.append(f"[CONTAINER] {line}")
+
+            return logs  # Return empty list if no logs of requested type
+
+        # Fallback for other response formats
+        if "logs" in result:
             return result["logs"]
+
     elif isinstance(result, list):
         return result
+
     return [json.dumps(result)]
 
 
@@ -154,17 +178,31 @@ OPTIONS:
   -t, --token     JWT token (optional if logged in via 'runpod-log login')
   -i, --team-id   Team ID (optional if logged in via 'runpod-log login')
   -n, --interval  Seconds between API polls (default: 5)
+  -l, --log-type  Type of logs: 'all', 'container', or 'system' (default: all)
+
+LOG TYPES:
+  RunPod pods have two types of logs:
+  - container: Application logs from your container (stdout/stderr)
+  - system: RunPod platform logs (volume creation, container events, etc.)
+
+  Each log line is prefixed with [CONTAINER] or [SYSTEM] to indicate its type.
 
 BEHAVIOR:
   - Runs continuously until interrupted with Ctrl+C
   - Deduplicates logs: each unique log line is written only once
   - If the output file exists, its contents are loaded to avoid duplicates
   - New log counts are printed to stderr: [+N new lines]
-  - On HTTP 401 (token expired), exits with code 1
+  - On HTTP 401 (token expired), automatically refreshes token
 
 EXAMPLES:
-  # Basic usage (uses saved credentials)
+  # Basic usage - get all logs (uses saved credentials)
   runpod-log tail abc123xyz /tmp/pod.log
+
+  # Only container logs
+  runpod-log tail abc123xyz /tmp/pod.log --log-type container
+
+  # Only system logs
+  runpod-log tail abc123xyz /tmp/pod.log --log-type system
 
   # Poll every 10 seconds
   runpod-log tail abc123xyz /tmp/pod.log --interval 10
@@ -202,7 +240,15 @@ FOR AI AGENTS:
     show_default=True,
     help="Polling interval in seconds",
 )
-def tail(pod_id: str, output_file: str, token: str | None, team_id: str | None, interval: int) -> None:
+@click.option(
+    "--log-type", "-l",
+    metavar="TYPE",
+    type=click.Choice(["all", "container", "system"], case_sensitive=False),
+    default="all",
+    show_default=True,
+    help="Type of logs to fetch: all, container, or system",
+)
+def tail(pod_id: str, output_file: str, token: str | None, team_id: str | None, interval: int, log_type: str) -> None:
     token, team_id = get_credentials(token, team_id)
     output_path = Path(output_file)
 
@@ -222,7 +268,7 @@ def tail(pod_id: str, output_file: str, token: str | None, team_id: str | None, 
         while True:
             try:
                 result = fetch_logs(pod_id, token, team_id)
-                logs = extract_logs(result)
+                logs = extract_logs(result, log_type)
 
                 new_logs = []
                 for log in logs:
@@ -274,15 +320,29 @@ ARGUMENTS:
 OPTIONS:
   -t, --token       JWT token (optional if logged in via 'runpod-log login')
   -i, --team-id     Team ID (optional if logged in via 'runpod-log login')
+  -l, --log-type    Type of logs: 'all', 'container', or 'system' (default: all)
   -j, --json-output Print raw JSON response instead of parsed logs
+
+LOG TYPES:
+  RunPod pods have two types of logs:
+  - container: Application logs from your container (stdout/stderr)
+  - system: RunPod platform logs (volume creation, container events, etc.)
+
+  Each log line is prefixed with [CONTAINER] or [SYSTEM] to indicate its type.
 
 OUTPUT:
   By default, prints one log line per line to stdout.
   With --json-output, prints the full API response as formatted JSON.
 
 EXAMPLES:
-  # Fetch and print logs
+  # Fetch and print all logs
   runpod-log logs abc123xyz
+
+  # Only container logs
+  runpod-log logs abc123xyz --log-type container
+
+  # Only system logs
+  runpod-log logs abc123xyz --log-type system
 
   # Save to file
   runpod-log logs abc123xyz > /tmp/pod.log
@@ -312,11 +372,19 @@ FOR AI AGENTS:
     help="RunPod team ID (uses saved credentials if not provided)",
 )
 @click.option(
+    "--log-type", "-l",
+    metavar="TYPE",
+    type=click.Choice(["all", "container", "system"], case_sensitive=False),
+    default="all",
+    show_default=True,
+    help="Type of logs to fetch: all, container, or system",
+)
+@click.option(
     "--json-output", "-j",
     is_flag=True,
     help="Output raw JSON response from API",
 )
-def logs(pod_id: str, token: str | None, team_id: str | None, json_output: bool) -> None:
+def logs(pod_id: str, token: str | None, team_id: str | None, log_type: str, json_output: bool) -> None:
     token, team_id = get_credentials(token, team_id)
 
     try:
@@ -325,7 +393,7 @@ def logs(pod_id: str, token: str | None, team_id: str | None, json_output: bool)
         if json_output:
             click.echo(json.dumps(result, indent=2))
         else:
-            for log in extract_logs(result):
+            for log in extract_logs(result, log_type):
                 click.echo(log)
 
     except httpx.HTTPStatusError as e:
