@@ -1,13 +1,12 @@
 # runpod-log
 
-CLI tool for fetching and tailing logs from RunPod GPU pods.
+CLI tool for fetching logs from RunPod GPU pods.
 
 Since the official RunPod CLI (`runpodctl`) doesn't support log viewing, this tool uses the unofficial RunPod API to fetch pod logs.
 
 ## Features
 
 - Fetch pod logs (one-time)
-- Tail logs continuously to a file
 - Browser-based authentication (Playwright)
 - Automatic token refresh using headless browser
 
@@ -47,62 +46,23 @@ runpod-log login
 
 Credentials are saved locally, and browser session is preserved for automatic token refresh.
 
-### 2. Fetch Logs (One-time)
+### 2. Fetch Logs
 
 ```bash
 # Print all logs (container + system) to stdout
 runpod-log logs <pod-id>
 
 # Only container logs (your application stdout/stderr)
-runpod-log logs <pod-id> --log-type container
+runpod-log logs <pod-id> --only container
 
 # Only system logs (RunPod platform events)
-runpod-log logs <pod-id> --log-type system
+runpod-log logs <pod-id> --only system
 
 # Save to file
 runpod-log logs <pod-id> > output.log
 
 # Output as JSON
 runpod-log logs <pod-id> --json-output
-```
-
-### 3. Tail Logs (Continuous)
-
-Continuously poll for new logs and append to a file:
-
-```bash
-# Tail all logs (container + system)
-runpod-log tail <pod-id> output.log
-
-# Only container logs
-runpod-log tail <pod-id> output.log --log-type container
-
-# Only system logs
-runpod-log tail <pod-id> output.log --log-type system
-
-# Custom polling interval (default: 5 seconds)
-runpod-log tail <pod-id> output.log --interval 10
-```
-
-The `tail` command:
-- Runs continuously until interrupted with Ctrl+C
-- Automatically refreshes tokens when they expire
-- Deduplicates logs to avoid duplicates
-- Prefixes each line with `[CONTAINER]` or `[SYSTEM]` to indicate log type
-
-## For AI Agents
-
-This tool is designed to be used by AI agents for log monitoring:
-
-```bash
-# Start tailing in background
-runpod-log tail <pod-id> /tmp/logs.txt &
-
-# Read the log file periodically to analyze
-cat /tmp/logs.txt
-
-# Kill the process when done
-kill %1
 ```
 
 ## Logout
@@ -126,7 +86,6 @@ runpod-log --help
 runpod-log login --help
 runpod-log logout --help
 runpod-log logs --help
-runpod-log tail --help
 ```
 
 ## Log Types

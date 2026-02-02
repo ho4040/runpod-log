@@ -3,14 +3,12 @@
 import io
 import json
 import sys
-import time
-from pathlib import Path
 
 import click
 import httpx
 
 from .api import fetch_logs
-from .auth import clear_credentials, load_credentials, login_via_browser, refresh_token_headless, save_credentials
+from .auth import clear_credentials, load_credentials, login_via_browser, save_credentials
 
 # Fix Windows console encoding for Unicode output
 if sys.platform == "win32":
@@ -19,11 +17,10 @@ if sys.platform == "win32":
 
 
 MAIN_HELP = """
-RunPod Log CLI - Fetch and tail logs from RunPod GPU pods.
+RunPod Log CLI - Fetch logs from RunPod GPU pods.
 
 This tool allows you to retrieve logs from RunPod pods using the unofficial
-RunPod API. It supports both one-time log fetching and continuous tailing
-to a file.
+RunPod API.
 
 AUTHENTICATION:
   Before using this tool, you must authenticate with RunPod:
@@ -37,21 +34,15 @@ AUTHENTICATION:
 QUICK START:
   1. Login:           runpod-log login
   2. Fetch logs:      runpod-log logs <pod-id>
-  3. Tail to file:    runpod-log tail <pod-id> output.log
 
 COMMANDS:
   login   - Authenticate with RunPod via browser
   logout  - Clear saved credentials and browser session
   logs    - Fetch pod logs once and print to stdout
-  tail    - Continuously poll for new logs and append to a file
 
 EXIT CODES:
   0 - Success
   1 - Error (authentication failure, network error, etc.)
-
-For AI agents: Use 'tail' command to write logs to a file, then read that
-file to analyze the logs. The 'tail' command runs continuously until
-interrupted with Ctrl+C.
 """
 
 
@@ -98,7 +89,7 @@ def login():
         click.echo("\nCredentials saved successfully!")
         click.echo(f"Team ID: {creds['team_id']}")
         click.echo(f"Session saved for automatic token refresh.")
-        click.echo("\nYou can now use 'runpod-log logs <pod-id>' or 'runpod-log tail <pod-id> <file>'")
+        click.echo("\nYou can now use 'runpod-log logs <pod-id>'")
     except Exception as e:
         click.echo(f"Error during login: {e}", err=True)
         sys.exit(1)
@@ -117,7 +108,7 @@ Use this command when you want to:
   - Clear sensitive data from this machine
 
 After logout, you will need to run 'runpod-log login' again to use
-the logs and tail commands.
+the logs command.
 
 STORAGE LOCATIONS:
   - Windows: %APPDATA%/runpod-log/
@@ -199,156 +190,15 @@ def extract_logs(result: dict | list, log_type: str = "all") -> list[str]:
     return [json.dumps(result)]
 
 
-TAIL_HELP = """
-Continuously tail logs from a RunPod pod and write to a file.
-
-This command polls the RunPod API at regular intervals and appends any
-new log lines to the specified output file. It also prints new logs to
-stdout in real-time.
-
-ARGUMENTS:
-  POD_ID       The RunPod pod identifier (e.g., 'abc123xyz')
-               Find this in the RunPod console URL or pod list.
-
-  OUTPUT_FILE  Path to the output file. New logs are appended.
-               The file is created if it doesn't exist.
-
-OPTIONS:
-  -t, --token     JWT token (optional if logged in via 'runpod-log login')
-  -i, --team-id   Team ID (optional if logged in via 'runpod-log login')
-  -n, --interval  Seconds between API polls (default: 5)
-  --only          Filter to show only 'container' or 'system' logs (optional)
-
-LOG TYPES:
-  RunPod pods have two types of logs:
-  - container: Application logs from your container (stdout/stderr)
-  - system: RunPod platform logs (volume creation, container events, etc.)
-
-  By default, BOTH container and system logs are shown together.
-  Each log line is prefixed with [CONTAINER] or [SYSTEM] to indicate its type.
-
-BEHAVIOR:
-  - Runs continuously until interrupted with Ctrl+C
-  - Deduplicates logs: each unique log line is written only once
-  - If the output file exists, its contents are loaded to avoid duplicates
-  - New log counts are printed to stderr: [+N new lines]
-  - On HTTP 401 (token expired), automatically refreshes token
-
-EXAMPLES:
-  # Basic usage - get all logs (RECOMMENDED - shows both container and system)
-  runpod-log tail abc123xyz /tmp/pod.log
-
-  # Poll every 10 seconds
-  runpod-log tail abc123xyz /tmp/pod.log --interval 10
-
-  # Filter to only container logs (use only when you need to exclude system logs)
-  runpod-log tail abc123xyz /tmp/pod.log --only container
-
-  # Filter to only system logs (use only when you need to exclude container logs)
-  runpod-log tail abc123xyz /tmp/pod.log --only system
-
-  # With explicit credentials
-  runpod-log tail abc123xyz /tmp/pod.log -t "eyJ..." -i "team_xxx"
-
-FOR AI AGENTS:
-  IMPORTANT: Do NOT use --only flag unless specifically asked to filter logs.
-  By default, both container and system logs are shown, which provides
-  complete information for debugging.
-
-  Example workflow:
-    1. Start: runpod-log tail <pod-id> /tmp/logs.txt &
-    2. Wait a few seconds for logs to accumulate
-    3. Read /tmp/logs.txt to analyze the logs
-    4. Kill the background process when done
-"""
-
-
-@cli.command(help=TAIL_HELP)
-@click.argument("pod_id", metavar="POD_ID")
-@click.argument("output_file", metavar="OUTPUT_FILE", type=click.Path())
-@click.option(
-    "--token", "-t",
-    metavar="TOKEN",
-    help="JWT authentication token (uses saved credentials if not provided)",
-)
-@click.option(
-    "--team-id", "-i",
-    metavar="TEAM_ID",
-    help="RunPod team ID (uses saved credentials if not provided)",
-)
-@click.option(
-    "--interval", "-n",
-    metavar="SECONDS",
-    default=5,
-    show_default=True,
-    help="Polling interval in seconds",
-)
-@click.option(
-    "--only",
-    metavar="TYPE",
-    type=click.Choice(["container", "system"], case_sensitive=False),
-    default=None,
-    help="Filter to show only 'container' or 'system' logs (default: show both)",
-)
-def tail(pod_id: str, output_file: str, token: str | None, team_id: str | None, interval: int, only: str | None) -> None:
-    token, team_id = get_credentials(token, team_id)
-    log_type = only if only else "all"
-    output_path = Path(output_file)
-
-    click.echo(f"Tailing logs from pod '{pod_id}' to '{output_file}'")
-    click.echo(f"Polling every {interval} seconds. Press Ctrl+C to stop.")
-
-    seen_logs: set[str] = set()
-
-    # Load existing logs from file to avoid duplicates
-    if output_path.exists():
-        with open(output_path, "r", encoding="utf-8") as f:
-            for line in f:
-                seen_logs.add(line.rstrip("\n"))
-        click.echo(f"Loaded {len(seen_logs)} existing log lines from file.")
-
-    try:
-        while True:
-            try:
-                result = fetch_logs(pod_id, token, team_id)
-                logs = extract_logs(result, log_type)
-
-                new_logs = []
-                for log in logs:
-                    if log not in seen_logs:
-                        seen_logs.add(log)
-                        new_logs.append(log)
-
-                if new_logs:
-                    with open(output_path, "a", encoding="utf-8") as f:
-                        for log in new_logs:
-                            f.write(log + "\n")
-                            click.echo(log)
-
-                    click.echo(f"[+{len(new_logs)} new lines]", err=True)
-
-            except httpx.HTTPStatusError as e:
-                if e.response.status_code in (401, 404):
-                    click.echo("[Token expired or invalid, refreshing...]", err=True)
-                    new_creds = refresh_token_headless()
-                    if new_creds:
-                        token = new_creds["token"]
-                        team_id = new_creds["team_id"]
-                        save_credentials(token, team_id, new_creds.get("session_id"))
-                        click.echo("[Token refreshed successfully]", err=True)
-                    else:
-                        click.echo("\nAuthentication may have expired or is invalid.", err=True)
-                        click.echo("Please run 'runpod-log login' to re-authenticate.", err=True)
-                        sys.exit(1)
-                else:
-                    click.echo(f"Error: HTTP {e.response.status_code}", err=True)
-            except httpx.RequestError as e:
-                click.echo(f"Request error: {e}", err=True)
-
-            time.sleep(interval)
-
-    except KeyboardInterrupt:
-        click.echo(f"\nStopped. Total unique logs: {len(seen_logs)}")
+@cli.command(hidden=True)
+@click.argument("args", nargs=-1)
+def tail(args) -> None:
+    """Deprecated: tail command has been removed."""
+    click.echo("The 'tail' command has been removed.", err=True)
+    click.echo("", err=True)
+    click.echo("Please use 'runpod-log logs <pod-id>' instead:", err=True)
+    click.echo("  runpod-log logs <pod-id> > output.log", err=True)
+    sys.exit(1)
 
 
 LOGS_HELP = """
@@ -401,8 +251,7 @@ EXAMPLES:
 FOR AI AGENTS:
   IMPORTANT: Do NOT use --only flag unless specifically asked to filter logs.
   By default, both container and system logs are shown, which provides
-  complete information for debugging. Use 'logs' for a one-time snapshot.
-  For continuous monitoring, use 'tail' instead which writes to a file.
+  complete information for debugging.
 """
 
 
