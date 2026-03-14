@@ -170,11 +170,11 @@ def extract_logs(result: dict | list, log_type: str = "all") -> list[str]:
         if has_runpod_format:
             logs = []
 
-            if log_type in ("all", "system") and "system" in result:
+            if log_type in ("all", "system") and result.get("system"):
                 for line in result["system"]:
                     logs.append(f"[SYSTEM] {line}")
 
-            if log_type in ("all", "container") and "container" in result:
+            if log_type in ("all", "container") and result.get("container"):
                 for line in result["container"]:
                     logs.append(f"[CONTAINER] {line}")
 
