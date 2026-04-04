@@ -76,6 +76,14 @@ NOTES:
   - Requires a display (cannot run in headless mode)
   - Uses Playwright with Chromium browser
   - The browser window will close automatically after capturing credentials
+
+AI AGENTS:
+  The browser session (cookies) is saved to disk. If you have logged in
+  before, running this command again will open a browser that is ALREADY
+  AUTHENTICATED - no manual interaction needed. The token is captured
+  automatically within seconds and the browser closes itself.
+  When you get a 401 error, just run 'runpod-log login' to refresh
+  credentials. It is safe to run non-interactively after the first login.
 """
 
 
@@ -297,6 +305,7 @@ def logs(pod_id: str, token: str | None, team_id: str | None, only: str | None, 
         if e.response.status_code in (401, 404):
             click.echo("\nAuthentication may have expired or is invalid.", err=True)
             click.echo("Please run 'runpod-log login' to re-authenticate.", err=True)
+            click.echo("(If you have logged in before, the saved browser session will auto-authenticate — no manual interaction needed.)", err=True)
         else:
             click.echo(f"Response: {e.response.text}", err=True)
         sys.exit(1)

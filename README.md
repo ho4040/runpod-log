@@ -46,6 +46,8 @@ runpod-log login
 
 Credentials are saved locally, and browser session is preserved for automatic token refresh.
 
+> **Note (for AI agents):** The browser session (cookies) is persisted to disk via Playwright's `launch_persistent_context`. If you have logged in before, running `runpod-log login` again will open a browser that is **already authenticated** — no manual interaction is needed. The CLI will capture the token automatically within seconds and close the browser. So when credentials expire (401), just run `runpod-log login` again; it is safe to execute non-interactively after the first login.
+
 ### 2. Fetch Logs
 
 ```bash
