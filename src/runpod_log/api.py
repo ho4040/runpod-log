@@ -4,7 +4,7 @@ import sys
 
 import httpx
 
-from .auth import load_credentials, refresh_token_headless, save_credentials
+from .auth import load_credentials, login_via_browser, refresh_token_headless, save_credentials
 
 
 def _request_logs(pod_id: str, token: str, team_id: str) -> httpx.Response:
@@ -51,9 +51,23 @@ def fetch_logs(pod_id: str, token: str, team_id: str) -> dict:
             )
         else:
             print(
-                "Token refresh failed. Run 'runpod-log login' to re-authenticate.",
+                "Headless token refresh failed. Attempting interactive re-authentication...",
                 file=sys.stderr,
             )
+            try:
+                new_creds = login_via_browser()
+                save_credentials(
+                    new_creds["token"],
+                    new_creds["team_id"],
+                    new_creds.get("session_id"),
+                )
+                print("Re-authentication successful.", file=sys.stderr)
+                response = _request_logs(
+                    pod_id, new_creds["token"], new_creds["team_id"]
+                )
+            except Exception as e:
+                print(f"Re-authentication failed: {e}", file=sys.stderr)
+                print("Manual login required: run 'runpod-log login'", file=sys.stderr)
 
     response.raise_for_status()
     return response.json()

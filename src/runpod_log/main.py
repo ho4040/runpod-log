@@ -303,9 +303,15 @@ def logs(pod_id: str, token: str | None, team_id: str | None, only: str | None, 
     except httpx.HTTPStatusError as e:
         click.echo(f"Error: HTTP {e.response.status_code}", err=True)
         if e.response.status_code in (401, 404):
-            click.echo("\nAuthentication may have expired or is invalid.", err=True)
-            click.echo("Please run 'runpod-log login' to re-authenticate.", err=True)
-            click.echo("(If you have logged in before, the saved browser session will auto-authenticate — no manual interaction needed.)", err=True)
+            click.echo("\nAuthentication expired. Attempting automatic re-authentication...", err=True)
+            from .auth import login_via_browser, save_credentials
+            try:
+                creds = login_via_browser()
+                save_credentials(creds["token"], creds["team_id"], creds.get("session_id"))
+                click.echo("Re-authentication successful. Please retry the command.", err=True)
+            except Exception as login_err:
+                click.echo(f"Auto re-authentication failed: {login_err}", err=True)
+                click.echo("Manual login required: run 'runpod-log login'", err=True)
         else:
             click.echo(f"Response: {e.response.text}", err=True)
         sys.exit(1)
